@@ -1,0 +1,12 @@
+# Original Telegram binary & code signature backups (~250MB)
+backup/
+
+# Build artifacts
+build/
+*.dylib
+*.o
+
+# macOS & editor files
+.DS_Store
+*.swp
+*~
