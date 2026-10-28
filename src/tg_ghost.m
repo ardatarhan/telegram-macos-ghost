@@ -182,8 +182,8 @@ static void save_preferences(void) {
 // ============================================================================
 
 typedef void (*fn_sendReadRequests_t)(void *histories);
-typedef uint64_t (*fn_mtpSendRequest_t)(void *instance, void *serializedReq, void *callbacks,
-                                        uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
+typedef void (*fn_mtpSendRequest_t)(void *instance, uint64_t requestId, void *serializedReq, void *callbacks,
+                                    uint64_t a4, int64_t a5, bool a6, uint64_t a7);
 typedef void (*fn_sessionSendPrepared_t)(void *session, void *prepared, int64_t msCanWait);
 typedef void (*fn_beforeDestroy_t)(void *session, void **begin, void **end);
 typedef void (*fn_destroyMessage_t)(void *history, void *item);
@@ -417,19 +417,19 @@ static bool should_block_tl_constructor(uint32_t cons, void *d_ptr_raw) {
     return false;
 }
 
-static uint64_t hook_mtpSendRequest(void *instance, void *serializedReq, void *callbacks,
-                                    uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7) {
-    if (serializedReq) {
+static void hook_mtpSendRequest(void *instance, uint64_t requestId, void *serializedReq, void *callbacks,
+                                uint64_t a4, int64_t a5, bool a6, uint64_t a7) {
+    if ((uintptr_t)serializedReq > 0x100000000ULL) {
         uint32_t *d_ptr = *((uint32_t **)serializedReq + 1);
         int64_t size = *((int64_t *)serializedReq + 2);
-        if (d_ptr && size >= 9) {
+        if ((uintptr_t)d_ptr > 0x100000000ULL && size >= 9) {
             uint32_t cons = d_ptr[8];
             if (should_block_tl_constructor(cons, d_ptr)) {
-                return 0;
+                return;
             }
         }
     }
-    return orig_mtpSendRequest(instance, serializedReq, callbacks, a3, a4, a5, a6, a7);
+    orig_mtpSendRequest(instance, requestId, serializedReq, callbacks, a4, a5, a6, a7);
 }
 
 static void hook_sessionSendPrepared(void *session, void *prepared, int64_t msCanWait) {
@@ -576,7 +576,6 @@ static int64_t hook_mediaTtlSeconds(const void *media) {
 static bool hook_itemAllowsFwd(const void *item) {
     if (g_unlock_restrictions) {
         clear_noforwards_on_item(item);
-        return true;
     }
     return orig_itemAllowsFwd(item);
 }
@@ -584,7 +583,6 @@ static bool hook_itemAllowsFwd(const void *item) {
 static bool hook_itemAllowsSave(const void *item) {
     if (g_unlock_restrictions) {
         clear_noforwards_on_item(item);
-        return true;
     }
     return orig_itemAllowsSave(item);
 }
@@ -628,7 +626,6 @@ static bool hook_overlayCanSave(const void *overlay) {
         }
         void *item = *(void **)((const uint8_t *)overlay + 0xe40);
         clear_noforwards_on_item(item);
-        return true;
     }
     return orig_overlayCanSave(overlay);
 }
